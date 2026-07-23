@@ -64,10 +64,5 @@ if st.button("Check Out"):
         if not updated:
             st.error("This person has not checked in yet or is already checked out.")
 
-# -----------------------------
-# DISPLAY LIVE LOG
-# -----------------------------
-st.header("📋 Current Crew Log (Live from Google Sheets)")
-records = sheet.get_all_records()
-st.table(records)
+
 
