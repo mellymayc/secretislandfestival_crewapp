@@ -1,50 +1,73 @@
 import streamlit as st
 from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="Crew Check-In & Check-Out", layout="centered")
 
 st.title("⭐ Secret Island Festival — Crew Check-In App")
 
-# Storage for crew data
-if "crew_data" not in st.session_state:
-    st.session_state.crew_data = []
+# -----------------------------
+# GOOGLE SHEETS SETUP
+# -----------------------------
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
-crew_data = st.session_state.crew_data
+creds = Credentials.from_service_account_info(
+    st.secrets["google"],
+    scopes=scope
+)
 
+client = gspread.authorize(creds)
+
+# Open your sheet
+sheet = client.open("Secret Island Crew Log").sheet1
+
+# -----------------------------
+# CHECK-IN / CHECK-OUT FORM
+# -----------------------------
 st.header("Crew Check-In / Check-Out")
 
 name = st.text_input("Crew Name")
-role = st.selectbox("Role", ["Security", "Bar", "Welfare", "Medics", "Gate", "Production", "Artist Liaison", "Other"])
+role = st.selectbox(
+    "Role",
+    ["Security", "Bar", "Welfare", "Medics", "Gate", "Production", "Artist Liaison", "Other"]
+)
 
-# Check In Button
+# Check In
 if st.button("Check In"):
     if name.strip() == "":
         st.error("Please enter a name before checking in.")
     else:
         check_in_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        crew_data.append({
-            "Name": name,
-            "Role": role,
-            "Check In": check_in_time,
-            "Check Out": ""
-        })
+        sheet.append_row([name, role, check_in_time, ""])
         st.success(f"{name} checked in at {check_in_time}")
 
-# Check Out Button
+# Check Out
 if st.button("Check Out"):
     if name.strip() == "":
         st.error("Please enter a name before checking out.")
     else:
         check_out_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        found = False
-        for person in crew_data:
-            if person["Name"] == name and person["Check Out"] == "":
-                person["Check Out"] = check_out_time
-                found = True
+        records = sheet.get_all_records()
+
+        updated = False
+        for i, row in enumerate(records, start=2):  # row 2 = first data row
+            if row["Name"] == name and row["Check Out"] == "":
+                sheet.update_cell(i, 4, check_out_time)
+                updated = True
                 st.success(f"{name} checked out at {check_out_time}")
                 break
-        if not found:
+
+        if not updated:
             st.error("This person has not checked in yet or is already checked out.")
 
-st.header("Current Crew Log")
-st.table(crew_data)
+# -----------------------------
+# DISPLAY LIVE LOG
+# -----------------------------
+st.header("📋 Current Crew Log (Live from Google Sheets)")
+records = sheet.get_all_records()
+st.table(records)
+
